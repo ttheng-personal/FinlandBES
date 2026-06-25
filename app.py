@@ -5,6 +5,14 @@ from bec.bom import build_bom_df, build_bom_summary
 from bec.connections import CONNECTION_COLUMNS, build_connection_rows
 from bec.constants import BAY_MM, DEFAULT_STOREY_HEIGHT_LABEL, MAX_RECOMMENDED_STOREY_HEIGHT_MM, STOREY_HEIGHT_OPTIONS_MM
 from bec.export import build_excel_export
+from bec.manufacturers import (
+    BETONI_SEARCH_URL,
+    FOOTER_NOTE,
+    INTRO_TEXT,
+    MANUFACTURER_COLUMNS,
+    MANUFACTURER_SECTIONS,
+    expander_label,
+)
 from bec.model import build_building
 from bec.plotting import render_floor_plan
 from bec.schedule import build_element_schedule_df
@@ -79,8 +87,8 @@ building = build_building(
     arrangement=arrangement,
 )
 
-tab1, tab2, tab3, tab4, tab5 = st.tabs(
-    ["Floor Plan", "Element Schedule", "Building Summary", "Connections Used", "Bill of Materials"]
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
+    ["Floor Plan", "Element Schedule", "Building Summary", "Connections Used", "Bill of Materials", "Manufacturers"]
 )
 
 with tab1:
@@ -221,3 +229,24 @@ with tab5:
         file_name="bec_bill_of_materials.xlsx",
         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     )
+
+with tab6:
+    st.subheader("Manufacturers")
+    st.caption(" · ".join(config_bits))
+
+    st.info(INTRO_TEXT)
+
+    for section in MANUFACTURER_SECTIONS:
+        with st.expander(expander_label(section)):
+            mfr_df = pd.DataFrame(section["manufacturers"], columns=MANUFACTURER_COLUMNS)
+            st.dataframe(
+                mfr_df,
+                hide_index=True,
+                use_container_width=True,
+                column_config={
+                    "Website": st.column_config.LinkColumn("Website", display_text=r"https://(.*)")
+                },
+            )
+
+    st.caption(FOOTER_NOTE)
+    st.link_button("Search live manufacturer database →", url=BETONI_SEARCH_URL)
