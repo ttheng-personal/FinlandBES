@@ -18,6 +18,7 @@ import pandas as pd
 from bec.constants import (
     BEC_ELEMENT_TERMS,
     CROSSWALL_CODE,
+    LIFT_SHAFT_CODE,
     SANDWICH_CODE,
     SLAB_CODE_LONG,
     SLAB_CODE_SHORT,
@@ -40,6 +41,7 @@ AREA_RATES = {
     SLAB_CODE_LONG: dict(kg_m2=370, conc_m3_m2=0.185, steel_kg_m2=22, insul_m2_m2=0.0, cost_eur_m2=44),
     CROSSWALL_CODE: dict(kg_m2=360, conc_m3_m2=0.150, steel_kg_m2=25, insul_m2_m2=0.0, cost_eur_m2=75),
     SANDWICH_CODE: dict(kg_m2=390, conc_m3_m2=0.160, steel_kg_m2=16, insul_m2_m2=1.0, cost_eur_m2=210),
+    LIFT_SHAFT_CODE: dict(kg_m2=480, conc_m3_m2=0.200, steel_kg_m2=30, insul_m2_m2=0.0, cost_eur_m2=120),
 }
 
 # Fixed per-piece rates (stair elements aren't priced by area).

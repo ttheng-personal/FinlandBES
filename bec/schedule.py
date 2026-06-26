@@ -16,6 +16,8 @@ from bec.constants import (
     BAY_MM,
     BEC_ELEMENT_TERMS,
     CROSSWALL_CODE,
+    LIFT_SHAFT_CODE,
+    LIFT_SHAFT_THICKNESS_MM,
     SANDWICH_CODE,
     SLAB_CODE_LONG,
     SLAB_CODE_SHORT,
@@ -35,6 +37,12 @@ STAIR_LANDING_DIMENSIONS_MM = (BAY_MM, BAY_MM)      # 1200 x 1200
 # per inter-storey rise. There are (num_storeys - 1) rises in a building.
 STAIR_FLIGHTS_PER_RISE = 2
 STAIR_LANDINGS_PER_RISE = 1
+
+# Lift shaft perimeter: a 1200 x 2400mm rectangle has 2 short (1200mm)
+# sides and 2 long (2400mm) sides, repeated once per storey (unlike
+# stairs, the shaft wall exists at every floor level, not just rises).
+LIFT_SHAFT_SHORT_PANELS = 2
+LIFT_SHAFT_LONG_PANELS = 2
 
 SCHEDULE_COLUMNS = [
     "Element Type", "BEC Code", "Finnish Term", "English Description",
@@ -143,6 +151,25 @@ def build_element_schedule_rows(building: BuildingGeom) -> List[Dict[str, Any]]:
             "_dim_a_mm": land_w,
             "_dim_b_mm": land_l,
         })
+
+    # 6. Lift shaft wall panels: only present once a lift shaft exists
+    # (num_storeys >= LIFT_SHAFT_TRIGGER_STOREYS). 4 panels enclose the
+    # 1200 x 2400mm shaft per storey: 2 short (1200mm wide) + 2 long
+    # (2400mm wide), both 200mm thick, full storey height.
+    if building.lift_shaft is not None:
+        hk_fi, hk_en = _terms(LIFT_SHAFT_CODE)
+        for panel_width, qty_per_floor in ((BAY_MM, LIFT_SHAFT_SHORT_PANELS), (2 * BAY_MM, LIFT_SHAFT_LONG_PANELS)):
+            rows.append({
+                "Element Type": "Lift shaft wall panel",
+                "BEC Code": LIFT_SHAFT_CODE,
+                "Finnish Term": hk_fi,
+                "English Description": hk_en,
+                "Unit Dimensions (mm)": f"{LIFT_SHAFT_THICKNESS_MM} × {panel_width}",
+                "Qty per Floor": qty_per_floor,
+                "Total Qty (all floors)": qty_per_floor * building.num_storeys,
+                "_dim_a_mm": LIFT_SHAFT_THICKNESS_MM,
+                "_dim_b_mm": panel_width,
+            })
 
     return rows
 

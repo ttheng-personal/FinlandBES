@@ -148,6 +148,20 @@ def render_floor_plan(
             ha="center", va="center", fontsize=7, rotation=90, color=COLORS["text"], zorder=6,
         )
 
+    if building.lift_shaft is not None:
+        ls = building.lift_shaft.rect
+        ax.add_patch(
+            mpatches.Rectangle(
+                (ls.x0, ls.y0), ls.width, ls.depth,
+                facecolor=COLORS["lift_shaft"], edgecolor="#111111", linewidth=0.8, zorder=4,
+            )
+        )
+        ax.text(
+            ls.x0 + ls.width / 2, ls.y0 + ls.depth / 2,
+            f"HK — Lift Shaft\n{ls.width}×{ls.depth}mm",
+            ha="center", va="center", fontsize=6.5, rotation=90, color="#ffffff", zorder=6,
+        )
+
     for wall in building.sandwich_walls:
         _add_wall(ax, wall)
     for wall in building.cross_walls:
@@ -167,6 +181,7 @@ def render_floor_plan(
         mpatches.Patch(color=COLORS["sandwich"], label="Sandwich panel (exterior, non-load-bearing)"),
         mpatches.Patch(color=COLORS["slab_base"], label="Hollow-core slab (hatch = span direction)"),
         mpatches.Patch(color=COLORS["stair_core"], label="Stair core"),
+        mpatches.Patch(color=COLORS["lift_shaft"], label="HK — Lift shaft"),
         mpatches.Patch(color=COLORS["living"], label="Living room"),
         mpatches.Patch(color=COLORS["kitchen"], label="Kitchen"),
         mpatches.Patch(color=COLORS["bathroom"], label="Bathroom"),

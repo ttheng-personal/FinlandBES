@@ -23,6 +23,7 @@ CROSSWALL_CODE = "V"      # Väliseinä -- load-bearing partition wall
 SANDWICH_CODE = "RK"      # Sisäkuorielementti, ei kantava -- non-load-bearing sandwich facade panel
 STAIR_FLIGHT_CODE = "T"   # Porraselementti -- stair flight element
 STAIR_LANDING_CODE = "L"  # Laattaelementti -- solid slab, stair landing
+LIFT_SHAFT_CODE = "HK"    # Hissikuiluelementti -- lift shaft element
 
 # Finnish term + English description for every BEC code used in this app,
 # keyed by the codes above. Displayed as side-by-side identifier columns
@@ -34,7 +35,18 @@ BEC_ELEMENT_TERMS = {
     SLAB_CODE_LONG: ("Ontelolaatta 320", "Hollow-core slab, 320mm deep"),
     STAIR_FLIGHT_CODE: ("Porraselementti", "Stair flight element"),
     STAIR_LANDING_CODE: ("Laattaelementti", "Solid slab (stair landing)"),
+    LIFT_SHAFT_CODE: ("Hissikuiluelementti", "Lift shaft element"),
 }
+
+# Lift shaft: mandatory (no user override) once a building reaches this
+# many storeys -- Finnish building code requires a lift from 4 storeys.
+# Footprint is fixed at 1 bay wide x 2 bays deep (1200 x 2400mm), walls
+# 200mm thick, placed directly beside the stair core on the side away
+# from the dwelling units.
+LIFT_SHAFT_TRIGGER_STOREYS = 4
+LIFT_SHAFT_WIDTH_BAYS = 1
+LIFT_SHAFT_DEPTH_BAYS = 2
+LIFT_SHAFT_THICKNESS_MM = 200
 
 # Wall/panel BoM rates (kg/m², m3/m2, EUR/m2) are given per m2 of WALL
 # FACE area (length x height) -- not plan footprint. A solid 150mm wall
@@ -58,6 +70,7 @@ COLORS = {
     "slab_base": "#cfe8f5",       # light blue, hollow-core slab
     "slab_hatch": "#5b9bd5",      # mid blue hatch lines (span direction)
     "stair_core": "#f0b429",      # amber
+    "lift_shaft": "#2c3e50",      # dark steel-blue
     "living": "#fdfbf6",          # warm white
     "kitchen": "#fff3c4",         # pale yellow
     "bathroom": "#c9eee2",        # pale teal

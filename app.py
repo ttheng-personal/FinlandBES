@@ -2,6 +2,22 @@ import pandas as pd
 import streamlit as st
 
 from bec.bom import build_bom_df, build_bom_summary
+from bec.carbon import (
+    build_carbon_df,
+    build_carbon_rows,
+    carbon_summary,
+    render_benchmark_bar,
+    render_carbon_chart,
+)
+from bec.compliance import (
+    ADVISORY,
+    FAIL,
+    INFO,
+    PASS,
+    build_compliance_rules,
+    compliance_summary,
+    format_rule_message,
+)
 from bec.connections import CONNECTION_COLUMNS, build_connection_rows
 from bec.constants import BAY_MM, DEFAULT_STOREY_HEIGHT_LABEL, MAX_RECOMMENDED_STOREY_HEIGHT_MM, STOREY_HEIGHT_OPTIONS_MM
 from bec.export import build_excel_export
@@ -87,8 +103,11 @@ building = build_building(
     arrangement=arrangement,
 )
 
-tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs(
-    ["Floor Plan", "Element Schedule", "Building Summary", "Connections Used", "Bill of Materials", "Manufacturers"]
+tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs(
+    [
+        "Floor Plan", "Element Schedule", "Building Summary", "Connections Used",
+        "Bill of Materials", "Embodied Carbon", "Manufacturers", "BEC Compliance Checker",
+    ]
 )
 
 with tab1:
@@ -137,8 +156,12 @@ with tab3:
     bathroom = room_by_kind(representative_unit, "bathroom")
     bedrooms = bedroom_rooms(representative_unit)
 
+    footprint_label = (
+        "Total footprint (incl. stair core & lift shaft)" if building.lift_shaft is not None
+        else "Total footprint (incl. stair core)"
+    )
     left_rows = [
-        ("Total footprint (incl. stair core)", f"{building.width_mm / 1000:.1f} m × {building.depth_mm / 1000:.1f} m"),
+        (footprint_label, f"{building.width_mm / 1000:.1f} m × {building.depth_mm / 1000:.1f} m"),
         ("Gross Floor Area per storey", f"{gross_floor_area_per_storey_m2(building):.1f} m²"),
         ("Total GFA (all storeys)", f"{total_gfa_m2(building):.1f} m²"),
         ("Number of dwellings", f"{total_dwellings(building)}"),
@@ -175,6 +198,11 @@ with tab3:
         "Net areas measured to inside face of structural walls. Wall thickness "
         "(150mm cross-walls, 360mm sandwich panels) is excluded from habitable area."
     )
+    if building.lift_shaft is not None:
+        st.caption(
+            "Lift shaft included — mandatory for buildings of 4 or more storeys "
+            "(Finnish building code)."
+        )
 
 with tab4:
     st.subheader("Connections Used")
@@ -231,6 +259,59 @@ with tab5:
     )
 
 with tab6:
+    st.subheader("Embodied Carbon")
+    st.caption(" · ".join(config_bits))
+
+    st.warning(
+        "⚠️ Carbon values are indicative, derived from Finnish precast industry EPD data "
+        "(EN 15804, A1–A3 product stage). They cover raw material extraction, transport to "
+        "factory, and manufacturing only. Installation, transport to site, and end-of-life "
+        "are excluded. Do not use for formal carbon assessments or Green Mark submissions."
+    )
+
+    carbon_rows = build_carbon_rows(building, storey_height_mm)
+    carbon_stats = carbon_summary(carbon_rows, building)
+
+    st.markdown("**Carbon Summary**")
+    cc1, cc2, cc3, cc4 = st.columns(4)
+    cc1.metric("Total embodied carbon", f"{carbon_stats['total_carbon_tonnes']:.1f} tCO₂e")
+    cc2.metric("Carbon intensity", f"{carbon_stats['intensity_kg_m2_gfa']:.0f} kgCO₂e/m² GFA")
+    cc3.metric(
+        "Heaviest contributor", carbon_stats["heaviest_type"],
+        f"{carbon_stats['heaviest_pct']:.0f}% of total", delta_color="off",
+    )
+    cc4.metric(
+        "Scale-adjusted benchmark", f"~{carbon_stats['benchmark_kg_m2_gfa']:.0f} kgCO₂e/m² GFA",
+        "structural shell only", delta_color="off",
+    )
+
+    benchmark_fig = render_benchmark_bar(
+        carbon_stats["intensity_kg_m2_gfa"], carbon_stats["benchmark_kg_m2_gfa"], carbon_stats["benchmark_status"]
+    )
+    st.pyplot(benchmark_fig, use_container_width=False)
+    st.caption(
+        "Benchmark varies by building scale. Small buildings typically show higher kgCO₂e/m² GFA "
+        "due to higher wall-to-floor-area ratios — this reflects geometry, not inefficiency in the "
+        "precast system. Current applicable benchmark for this configuration: "
+        f"{carbon_stats['benchmark_kg_m2_gfa']:.0f} kgCO₂e/m² GFA."
+    )
+
+    st.markdown("**Carbon Breakdown**")
+    carbon_df = build_carbon_df(building, storey_height_mm)
+    st.dataframe(carbon_df, hide_index=True, use_container_width=True)
+
+    st.markdown("**Carbon Breakdown Chart**")
+    carbon_chart_fig = render_carbon_chart(carbon_rows)
+    st.pyplot(carbon_chart_fig, use_container_width=False)
+
+    st.caption(
+        "Precast concrete construction typically achieves 15–25% lower embodied carbon than "
+        "equivalent cast-in-situ construction, due to optimised factory mix designs, reduced "
+        "formwork waste, and precise material quantities. Source: Betoniteollisuus ry / "
+        "Finnish Concrete Industry Association."
+    )
+
+with tab7:
     st.subheader("Manufacturers")
     st.caption(" · ".join(config_bits))
 
@@ -250,3 +331,45 @@ with tab6:
 
     st.caption(FOOTER_NOTE)
     st.link_button("Search live manufacturer database →", url=BETONI_SEARCH_URL)
+
+with tab8:
+    st.subheader("BEC Compliance Checker")
+    st.caption(" · ".join(config_bits))
+
+    rules = build_compliance_rules(building, storey_height_mm)
+    summary = compliance_summary(rules)
+
+    st.markdown(
+        f"""<div style="background:#f0f4f8;border:1px solid #c8d6e5;border-radius:8px;"""
+        f"""padding:12px 20px;margin-bottom:4px;font-size:1.05em;">"""
+        f"""✅ <strong>{summary[PASS]} Passed</strong> &nbsp;·&nbsp; """
+        f"""⚠️ <strong>{summary[ADVISORY]} Advisory</strong> &nbsp;·&nbsp; """
+        f"""❌ <strong>{summary[FAIL]} Failed</strong>"""
+        f"""</div>""",
+        unsafe_allow_html=True,
+    )
+
+    status_renderer = {
+        PASS: st.success,
+        ADVISORY: st.warning,
+        FAIL: st.error,
+        INFO: st.info,
+    }
+
+    sections = ["Structural Rules", "Dimensional Rules", "Open-Standard Compliance"]
+    for section in sections:
+        st.markdown(f"### {section}")
+        for rule in rules:
+            if rule["section"] != section:
+                continue
+            status_renderer[rule["status"]](format_rule_message(rule))
+
+    st.markdown(
+        f"**✅ {summary[PASS]} rules passed · ⚠️ {summary[ADVISORY]} advisory · "
+        f"❌ {summary[FAIL]} failed**"
+    )
+    if summary[ADVISORY] == 0 and summary[FAIL] == 0:
+        st.success(
+            "This configuration is fully BEC/BES compliant. All elements can be "
+            "manufactured and assembled using the open Finnish precast standard."
+        )

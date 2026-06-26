@@ -17,7 +17,7 @@ unit's net area computed the same way.
 
 from typing import List, Tuple
 
-from bec.constants import CROSSWALL_THICKNESS_MM, SANDWICH_THICKNESS_MM
+from bec.constants import BAY_MM, CROSSWALL_THICKNESS_MM, SANDWICH_THICKNESS_MM
 from bec.model import BuildingGeom, Room, UnitGeom
 
 HALF_CROSSWALL_MM = CROSSWALL_THICKNESS_MM / 2
@@ -58,7 +58,17 @@ def room_by_kind(unit: UnitGeom, kind: str) -> Room:
 
 
 def gross_floor_area_per_storey_m2(building: BuildingGeom) -> float:
-    return (building.width_mm * building.depth_mm) / 1_000_000
+    """Gross Floor Area excludes the lift shaft -- it's common circulation
+    area, not floor area. The shaft only occupies the front 2 bays of its
+    column (see bec.model), so the rest of that column was never real
+    floor area either; excluding the whole bay-wide column (not just the
+    shaft's own small footprint) keeps GFA accurate rather than counting
+    that phantom remainder as usable area.
+    """
+    effective_width = building.width_mm
+    if building.lift_shaft is not None:
+        effective_width -= BAY_MM
+    return (effective_width * building.depth_mm) / 1_000_000
 
 
 def total_gfa_m2(building: BuildingGeom) -> float:

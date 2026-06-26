@@ -23,12 +23,26 @@ Building assembly:
     of the unit blocks only -- the stair shaft is never interrupted).
   - A single shared stair core (1 bay wide, full building depth) is
     appended to the right-hand edge of the footprint when num_storeys > 1.
+  - A lift shaft (1 bay wide x 2 bays deep) is appended immediately
+    beside the stair core, on the side away from the units, when
+    num_storeys >= LIFT_SHAFT_TRIGGER_STOREYS. Mandatory, no override.
+    The building's overall width (used for footprint/GFA/drawing) grows
+    by one more bay to fit it; the shaft itself only occupies the front
+    2 bays of that column -- the rest of that column beyond the shaft is
+    not real floor area (see bec.summary for how GFA accounts for this).
 """
 
 from dataclasses import dataclass, field
 from typing import List, Optional, Literal
 
-from bec.constants import BAY_MM, CROSSWALL_THICKNESS_MM, SANDWICH_THICKNESS_MM
+from bec.constants import (
+    BAY_MM,
+    CROSSWALL_THICKNESS_MM,
+    LIFT_SHAFT_DEPTH_BAYS,
+    LIFT_SHAFT_TRIGGER_STOREYS,
+    LIFT_SHAFT_WIDTH_BAYS,
+    SANDWICH_THICKNESS_MM,
+)
 
 Arrangement = Literal["row", "grid"]
 
@@ -92,6 +106,11 @@ class StairCore:
 
 
 @dataclass(frozen=True)
+class LiftShaft:
+    rect: Rect
+
+
+@dataclass(frozen=True)
 class BuildingGeom:
     width_mm: int
     depth_mm: int
@@ -99,6 +118,7 @@ class BuildingGeom:
     cross_walls: List[WallSegment]
     sandwich_walls: List[WallSegment]
     stair_core: Optional[StairCore]
+    lift_shaft: Optional[LiftShaft]
     num_storeys: int
     num_units: int
     width_bays: int
@@ -211,6 +231,19 @@ def build_building(
         stair_core = StairCore(Rect(arrangement_width, 0, arrangement_width + BAY_MM, arrangement_depth))
         total_width = arrangement_width + BAY_MM
 
+    # Lift shaft: mandatory, no user override, once storeys reach the
+    # trigger. Sits immediately beside the stair core, on the side away
+    # from the units -- i.e. appended to whatever the current right edge
+    # (total_width) is. Only 2 bays deep (not full building depth).
+    lift_shaft = None
+    if has_stair and num_storeys >= LIFT_SHAFT_TRIGGER_STOREYS:
+        ls_w = LIFT_SHAFT_WIDTH_BAYS * BAY_MM
+        ls_d = LIFT_SHAFT_DEPTH_BAYS * BAY_MM
+        ls_x0 = total_width
+        _assert_grid_aligned(ls_x0, ls_x0 + ls_w, ls_d)
+        lift_shaft = LiftShaft(Rect(ls_x0, 0, ls_x0 + ls_w, ls_d))
+        total_width = ls_x0 + ls_w
+
     total_depth = arrangement_depth
 
     # Load-bearing cross-walls: one continuous wall per column boundary,
@@ -249,6 +282,7 @@ def build_building(
         cross_walls=cross_walls,
         sandwich_walls=sandwich_walls,
         stair_core=stair_core,
+        lift_shaft=lift_shaft,
         num_storeys=num_storeys,
         num_units=num_units,
         width_bays=width_bays,
